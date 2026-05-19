@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Code Canvas Generator</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <main class="layout">
+    <section class="panel controls" aria-labelledby="title">
+      <div class="header-block">
+        <h1 id="title">Code Canvas Generator</h1>
+        <p>Self-hosted barcode and QR generator. All state is encoded as query parameters.</p>
+      </div>
+
+      <form id="controls" autocomplete="off">
+        <label>
+          Code type / bwip-js id
+          <input id="type" name="type" list="type-list" value="qrcode" spellcheck="false">
+          <datalist id="type-list"></datalist>
+        </label>
+
+        <div class="row two">
+          <label>
+            Input format
+            <select id="input" name="input">
+              <option value="text">Text / UTF-8</option>
+              <option value="ascii">ASCII</option>
+              <option value="latin1">Latin-1 binary string</option>
+              <option value="base64">Base64 bytes</option>
+              <option value="base64url">Base64URL bytes</option>
+              <option value="hex">Hex dump</option>
+              <option value="binary">Binary bits</option>
+              <option value="urlencoded">URL-encoded text</option>
+              <option value="json">JSON string/value</option>
+            </select>
+          </label>
+
+          <label>
+            Rotation
+            <select id="rotate" name="rotate">
+              <option value="N">Normal</option>
+              <option value="R">Right 90°</option>
+              <option value="L">Left 90°</option>
+              <option value="I">Invert 180°</option>
+            </select>
+          </label>
+        </div>
+
+        <label>
+          Data
+          <textarea id="data" name="data" rows="7" spellcheck="false">https://example.com/?hello=world</textarea>
+        </label>
+
+        <div class="row three">
+          <label>
+            Code size px
+            <input id="size" name="size" type="number" min="16" max="4096" step="1" value="256">
+          </label>
+          <label>
+            Margin px
+            <input id="margin" name="margin" type="number" min="0" max="2000" step="1" value="0">
+          </label>
+          <label>
+            Engine scale
+            <input id="scale" name="scale" type="number" min="1" max="20" step="1" value="4">
+          </label>
+        </div>
+
+        <div class="row two">
+          <label>
+            Foreground
+            <input id="fg" name="fg" type="color" value="#000000">
+          </label>
+          <label>
+            Background
+            <input id="bg" name="bg" type="color" value="#ffffff">
+          </label>
+        </div>
+
+        <details>
+          <summary>Advanced options</summary>
+          <div class="row three advanced-grid">
+            <label>
+              Human text
+              <select id="includetext" name="includetext">
+                <option value="false">Off</option>
+                <option value="true">On</option>
+              </select>
+            </label>
+            <label>
+              Text align
+              <select id="textalign" name="textalign">
+                <option value="center">Center</option>
+                <option value="left">Left</option>
+                <option value="right">Right</option>
+                <option value="justify">Justify</option>
+              </select>
+            </label>
+            <label>
+              Linear height mm
+              <input id="heightmm" name="heightmm" type="number" min="1" max="200" step="1" placeholder="optional">
+            </label>
+          </div>
+
+          <div class="row three advanced-grid">
+            <label>
+              QR EC level
+              <select id="eclevel" name="eclevel">
+                <option value="">Default</option>
+                <option value="L">L</option>
+                <option value="M">M</option>
+                <option value="Q">Q</option>
+                <option value="H">H</option>
+              </select>
+            </label>
+            <label>
+              parsefnc
+              <select id="parsefnc" name="parsefnc">
+                <option value="">Default</option>
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+            <label>
+              parse
+              <select id="parse" name="parse">
+                <option value="">Default</option>
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+          </div>
+        </details>
+
+        <div class="actions">
+          <button type="button" id="sample">Use sample for type</button>
+          <button type="button" id="copy-page">Copy page URL</button>
+          <button type="button" id="copy-image">Copy image URL</button>
+          <button type="button" id="download">Download PNG</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel preview" aria-labelledby="preview-title">
+      <div class="preview-header">
+        <div>
+          <h2 id="preview-title">Live preview</h2>
+          <p id="meta">Output: 256 × 256 px</p>
+        </div>
+        <span id="status" role="status">Ready</span>
+      </div>
+
+      <div class="canvas-shell">
+        <canvas id="canvas" width="256" height="256" aria-label="Generated code preview"></canvas>
+      </div>
+
+      <label>
+        Generated image URL
+        <input id="image-url" readonly spellcheck="false">
+      </label>
+
+      <p class="note">
+        Margin is explicit white padding around the generated symbol. With margin 200 and size 256, the final PNG is 656 × 656 px.
+      </p>
+    </section>
+  </main>
+</body>
+</html>

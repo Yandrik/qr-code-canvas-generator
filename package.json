@@ -1,0 +1,20 @@
+{
+  "name": "code-canvas-generator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Self-hosted canvas barcode and QR code generator with query-parameter share URLs.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "check": "node --check src/server.js && node --check src/input.js && node --check src/render.js && node --check src/symbologies.js"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "dependencies": {
+    "@bwip-js/node": "^4.10.1",
+    "express": "^5.2.1",
+    "sharp": "^0.34.5"
+  }
+}
