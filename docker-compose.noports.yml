@@ -1,0 +1,10 @@
+services:
+  code-canvas-generator:
+    build: .
+    container_name: code-canvas-generator
+    environment:
+      PORT: "8080"
+      MAX_DATA_BYTES: "8192"
+      MAX_CODE_SIZE: "4096"
+      MAX_MARGIN: "2000"
+    restart: unless-stopped
