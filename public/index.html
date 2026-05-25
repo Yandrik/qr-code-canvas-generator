@@ -140,7 +140,9 @@
         <div class="actions">
           <button type="button" id="sample">Use sample for type</button>
           <button type="button" id="copy-page">Copy page URL</button>
+          <button type="button" id="copy-short-page">Copy short URL</button>
           <button type="button" id="copy-image">Copy image URL</button>
+          <button type="button" id="copy-short-image">Copy short image URL</button>
           <button type="button" id="download">Download PNG</button>
         </div>
       </form>
@@ -162,6 +164,11 @@
       <label>
         Generated image URL
         <input id="image-url" readonly spellcheck="false">
+      </label>
+
+      <label>
+        Compressed URL
+        <input id="short-url" readonly spellcheck="false">
       </label>
 
       <p class="note">

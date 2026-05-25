@@ -1,6 +1,7 @@
 'use strict';
 
 const path = require('node:path');
+const { inflateRawSync } = require('node:zlib');
 const express = require('express');
 const { renderCodePng } = require('./render');
 const { POPULAR_TYPES, sampleForType } = require('./symbologies');
@@ -48,7 +49,8 @@ app.get('/api/sample/:type', (req, res) => {
 
 app.get('/api/code.png', async (req, res) => {
   try {
-    const result = await renderCodePng(req.query);
+    const query = decodeShortQuery(req.query);
+    const result = await renderCodePng(query);
     res.setHeader('Content-Type', 'image/png');
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Code-Type', result.normalized.type);
@@ -78,6 +80,62 @@ app.use((req, res) => {
 app.listen(port, '0.0.0.0', () => {
   console.log(`Code Canvas Generator listening on http://0.0.0.0:${port}`);
 });
+
+
+function decodeShortQuery(query) {
+  const encoded = query && query.s;
+  if (!encoded || typeof encoded !== 'string') {
+    return query;
+  }
+
+  const expanded = decodeState(encoded);
+  return { ...query, ...expanded };
+}
+
+function decodeState(encoded) {
+  let jsonBytes;
+
+  if (encoded.startsWith('z.')) {
+    const compressed = fromBase64Url(encoded.slice(2));
+    jsonBytes = inflateRawSync(compressed);
+  } else {
+    jsonBytes = fromBase64Url(encoded);
+  }
+
+  const payload = JSON.parse(Buffer.from(jsonBytes).toString('utf8'));
+  const dict = payload && payload.d ? payload.d : {};
+  const output = {};
+
+  for (const [key, value] of Object.entries(dict)) {
+    output[KEY_MAP[key] || key] = String(value);
+  }
+
+  return output;
+}
+
+function fromBase64Url(input) {
+  const b64 = input.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
+  return Buffer.from(padded, 'base64');
+}
+
+const KEY_MAP = {
+  t: 'type',
+  i: 'input',
+  d: 'data',
+  z: 'size',
+  m: 'margin',
+  c: 'scale',
+  r: 'rotate',
+  f: 'fg',
+  b: 'bg',
+  x: 'includetext',
+  a: 'textalign',
+  h: 'heightmm',
+  e: 'eclevel',
+  n: 'parsefnc',
+  p: 'parse'
+};
 
 function acceptsJson(req) {
   const accept = String(req.headers.accept || '');

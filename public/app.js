@@ -20,12 +20,15 @@ const els = {
   parse: document.getElementById('parse'),
   sample: document.getElementById('sample'),
   copyPage: document.getElementById('copy-page'),
+  copyShortPage: document.getElementById('copy-short-page'),
   copyImage: document.getElementById('copy-image'),
+  copyShortImage: document.getElementById('copy-short-image'),
   download: document.getElementById('download'),
   canvas: document.getElementById('canvas'),
   status: document.getElementById('status'),
   meta: document.getElementById('meta'),
-  imageUrl: document.getElementById('image-url')
+  imageUrl: document.getElementById('image-url'),
+  shortUrl: document.getElementById('short-url')
 };
 
 const SHORT_KEY = 's';
@@ -119,11 +122,19 @@ function bindEvents() {
   });
 
   els.copyPage.addEventListener('click', async () => {
-    await copyText(await buildPageUrl(), 'Page URL copied');
+    await copyText(await buildFullPageUrl(), 'Page URL copied');
+  });
+
+  els.copyShortPage.addEventListener('click', async () => {
+    await copyText(await buildPageUrl(), 'Short URL copied');
   });
 
   els.copyImage.addEventListener('click', async () => {
     await copyText(buildAbsoluteImageUrl(), 'Image URL copied');
+  });
+
+  els.copyShortImage.addEventListener('click', async () => {
+    await copyText(await buildShortImageUrl(), 'Short image URL copied');
   });
 
   els.download.addEventListener('click', () => {
@@ -206,12 +217,15 @@ function scheduleRender() {
 async function render() {
   const generation = ++renderGeneration;
   const params = buildParams();
+  const shortState = await buildShortState();
   const imagePath = `/api/code.png?${params.toString()}`;
   const imageUrl = `${window.location.origin}${imagePath}`;
+  const shortPageUrl = `${window.location.pathname}?${SHORT_KEY}=${encodeURIComponent(shortState)}`;
   els.imageUrl.value = imageUrl;
+  els.shortUrl.value = shortPageUrl;
 
   updateMeta();
-  history.replaceState(null, '', await buildPageUrl());
+  history.replaceState(null, '', shortPageUrl);
   setStatus('Rendering…');
 
   const response = await fetch(imagePath, { headers: { Accept: 'image/png, application/json' } });
@@ -267,6 +281,20 @@ function stripHash(color) {
 }
 
 async function buildPageUrl() {
+  const encoded = await buildShortState();
+  return `${window.location.pathname}?${SHORT_KEY}=${encodeURIComponent(encoded)}`;
+}
+
+async function buildFullPageUrl() {
+  return `${window.location.pathname}?${buildParams().toString()}`;
+}
+
+async function buildShortImageUrl() {
+  const encoded = await buildShortState();
+  return `${window.location.origin}/api/code.png?${SHORT_KEY}=${encodeURIComponent(encoded)}`;
+}
+
+async function buildShortState() {
   const payload = { v: STATE_VERSION, d: {} };
   const params = buildParams();
 
@@ -275,8 +303,7 @@ async function buildPageUrl() {
     payload.d[shortKey] = value;
   }
 
-  const encoded = await encodeState(payload);
-  return `${window.location.pathname}?${SHORT_KEY}=${encodeURIComponent(encoded)}`;
+  return encodeState(payload);
 }
 
 function buildAbsoluteImageUrl() {
