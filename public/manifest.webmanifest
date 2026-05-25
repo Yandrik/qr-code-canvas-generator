@@ -1,0 +1,15 @@
+{
+  "name": "Code Canvas Generator",
+  "short_name": "CodeCanvas",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#111111",
+  "theme_color": "#111111",
+  "icons": [
+    {
+      "src": "/docs/assets/code-canvas-generator.png",
+      "sizes": "1024x882",
+      "type": "image/png"
+    }
+  ]
+}

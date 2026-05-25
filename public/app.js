@@ -28,6 +28,29 @@ const els = {
   imageUrl: document.getElementById('image-url')
 };
 
+const SHORT_KEY = 's';
+const STATE_VERSION = 1;
+const KEY_MAP = {
+  t: 'type',
+  i: 'input',
+  d: 'data',
+  z: 'size',
+  m: 'margin',
+  c: 'scale',
+  r: 'rotate',
+  f: 'fg',
+  b: 'bg',
+  x: 'includetext',
+  a: 'textalign',
+  h: 'heightmm',
+  e: 'eclevel',
+  n: 'parsefnc',
+  p: 'parse'
+};
+const REVERSE_KEY_MAP = Object.fromEntries(
+  Object.entries(KEY_MAP).map(([key, value]) => [value, key])
+);
+
 const DEFAULTS = {
   type: 'qrcode',
   input: 'text',
@@ -46,14 +69,13 @@ let renderGeneration = 0;
 let popularTypes = [];
 let debounceTimer = null;
 
-main().catch((error) => {
-  setStatus(`Startup error: ${error.message || error}`, true);
-});
+main().catch((error) => setStatus(`Startup error: ${error.message || error}`, true));
 
 async function main() {
   await loadTypes();
-  hydrateFromQuery();
+  await hydrateFromQuery();
   bindEvents();
+  registerServiceWorker();
   await render();
 }
 
@@ -65,8 +87,8 @@ async function loadTypes() {
 
   const payload = await response.json();
   popularTypes = payload.popular || [];
-
   els.typeList.innerHTML = '';
+
   for (const item of popularTypes) {
     const option = document.createElement('option');
     option.value = item.id;
@@ -81,12 +103,14 @@ function bindEvents() {
 
   els.sample.addEventListener('click', async () => {
     const type = els.type.value.trim() || DEFAULTS.type;
+
     try {
       const response = await fetch(`/api/sample/${encodeURIComponent(type)}`);
       const payload = await response.json();
       if (!response.ok) {
         throw new Error(payload.error || 'No sample available.');
       }
+
       els.data.value = payload.data;
       scheduleRender();
     } catch (error) {
@@ -95,37 +119,49 @@ function bindEvents() {
   });
 
   els.copyPage.addEventListener('click', async () => {
-    const url = buildPageUrl();
-    await copyText(url, 'Page URL copied');
+    await copyText(await buildPageUrl(), 'Page URL copied');
   });
 
   els.copyImage.addEventListener('click', async () => {
-    const url = buildAbsoluteImageUrl();
-    await copyText(url, 'Image URL copied');
+    await copyText(buildAbsoluteImageUrl(), 'Image URL copied');
   });
 
   els.download.addEventListener('click', () => {
     const filename = filenameForCurrentCode();
-    els.canvas.toBlob((blob) => {
-      if (!blob) {
-        setStatus('Could not create PNG blob.', true);
-        return;
-      }
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-      setStatus('PNG downloaded');
-    }, 'image/png');
+
+    els.canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          setStatus('Could not create PNG blob.', true);
+          return;
+        }
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        setStatus('PNG downloaded');
+      },
+      'image/png'
+    );
   });
 }
 
-function hydrateFromQuery() {
+async function hydrateFromQuery() {
   const params = new URLSearchParams(window.location.search);
+
+  if (params.get(SHORT_KEY)) {
+    const expanded = await decodeState(params.get(SHORT_KEY));
+    if (expanded) {
+      for (const [key, value] of Object.entries(expanded)) {
+        params.set(key, value);
+      }
+    }
+  }
 
   setValue(els.type, params.get('type') || params.get('bcid') || DEFAULTS.type);
   setValue(els.input, params.get('input') || params.get('format') || DEFAULTS.input);
@@ -134,8 +170,14 @@ function hydrateFromQuery() {
   setValue(els.margin, params.get('margin') || DEFAULTS.margin);
   setValue(els.scale, params.get('scale') || DEFAULTS.scale);
   setValue(els.rotate, params.get('rotate') || DEFAULTS.rotate);
-  setValue(els.fg, normalizeColorForInput(params.get('fg') || params.get('foreground') || DEFAULTS.fg));
-  setValue(els.bg, normalizeColorForInput(params.get('bg') || params.get('background') || DEFAULTS.bg));
+  setValue(
+    els.fg,
+    normalizeColorForInput(params.get('fg') || params.get('foreground') || DEFAULTS.fg)
+  );
+  setValue(
+    els.bg,
+    normalizeColorForInput(params.get('bg') || params.get('background') || DEFAULTS.bg)
+  );
   setValue(els.includetext, params.get('includetext') || DEFAULTS.includetext);
   setValue(els.textalign, params.get('textalign') || DEFAULTS.textalign);
   setValue(els.heightmm, params.get('heightmm') || params.get('height') || '');
@@ -144,9 +186,9 @@ function hydrateFromQuery() {
   setValue(els.parse, params.get('parse') || '');
 }
 
-function setValue(element, value) {
+const setValue = (element, value) => {
   element.value = value;
-}
+};
 
 function normalizeColorForInput(value) {
   const stripped = String(value || '').trim().replace(/^#/, '');
@@ -154,10 +196,11 @@ function normalizeColorForInput(value) {
 }
 
 function scheduleRender() {
-  window.clearTimeout(debounceTimer);
-  debounceTimer = window.setTimeout(() => {
-    render().catch((error) => setStatus(error.message || String(error), true));
-  }, 120);
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(
+    () => render().catch((error) => setStatus(error.message || String(error), true)),
+    120
+  );
 }
 
 async function render() {
@@ -165,10 +208,10 @@ async function render() {
   const params = buildParams();
   const imagePath = `/api/code.png?${params.toString()}`;
   const imageUrl = `${window.location.origin}${imagePath}`;
-
   els.imageUrl.value = imageUrl;
+
   updateMeta();
-  window.history.replaceState(null, '', buildPageUrl());
+  history.replaceState(null, '', await buildPageUrl());
   setStatus('Rendering…');
 
   const response = await fetch(imagePath, { headers: { Accept: 'image/png, application/json' } });
@@ -177,8 +220,7 @@ async function render() {
   }
 
   if (!response.ok) {
-    const message = await readError(response);
-    setStatus(message, true);
+    setStatus(await readError(response), true);
     return;
   }
 
@@ -196,7 +238,6 @@ async function render() {
 
 function buildParams() {
   const params = new URLSearchParams();
-
   params.set('type', els.type.value.trim() || DEFAULTS.type);
   params.set('input', els.input.value || DEFAULTS.input);
   params.set('data', els.data.value);
@@ -208,106 +249,180 @@ function buildParams() {
   params.set('bg', stripHash(els.bg.value || DEFAULTS.bg));
   params.set('includetext', els.includetext.value || DEFAULTS.includetext);
   params.set('textalign', els.textalign.value || DEFAULTS.textalign);
-
   setOptional(params, 'heightmm', els.heightmm.value);
   setOptional(params, 'eclevel', els.eclevel.value);
   setOptional(params, 'parsefnc', els.parsefnc.value);
   setOptional(params, 'parse', els.parse.value);
-
   return params;
 }
 
 function setOptional(params, key, value) {
-  if (value !== undefined && String(value).trim() !== '') {
+  if (String(value || '').trim()) {
     params.set(key, String(value).trim());
   }
 }
 
-function buildPageUrl() {
-  return `${window.location.origin}${window.location.pathname}?${buildParams().toString()}`;
+function stripHash(color) {
+  return String(color || '').replace(/^#/, '').toLowerCase();
+}
+
+async function buildPageUrl() {
+  const payload = { v: STATE_VERSION, d: {} };
+  const params = buildParams();
+
+  for (const [key, value] of params.entries()) {
+    const shortKey = REVERSE_KEY_MAP[key] || key;
+    payload.d[shortKey] = value;
+  }
+
+  const encoded = await encodeState(payload);
+  return `${window.location.pathname}?${SHORT_KEY}=${encodeURIComponent(encoded)}`;
 }
 
 function buildAbsoluteImageUrl() {
   return `${window.location.origin}/api/code.png?${buildParams().toString()}`;
 }
 
-function stripHash(color) {
-  return String(color || '').replace(/^#/, '');
-}
-
 function updateMeta() {
-  const size = Math.max(0, Number.parseInt(els.size.value || DEFAULTS.size, 10));
-  const margin = Math.max(0, Number.parseInt(els.margin.value || DEFAULTS.margin, 10));
-  const output = size + margin * 2;
+  const size = Number.parseInt(els.size.value || DEFAULTS.size, 10);
+  const margin = Number.parseInt(els.margin.value || DEFAULTS.margin, 10);
+  const output = Math.max(1, size) + Math.max(0, margin) * 2;
   els.meta.textContent = `Output: ${output} × ${output} px`;
 }
 
-function drawImageToCanvas(image) {
-  const canvas = els.canvas;
-  canvas.width = image.naturalWidth;
-  canvas.height = image.naturalHeight;
+function setStatus(message, isError = false) {
+  els.status.textContent = message;
+  els.status.dataset.state = isError ? 'error' : 'ok';
+}
 
-  const ctx = canvas.getContext('2d');
-  ctx.imageSmoothingEnabled = false;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(image, 0, 0);
+async function copyText(text, okMessage) {
+  try {
+    await navigator.clipboard.writeText(text);
+    setStatus(okMessage);
+  } catch {
+    setStatus('Clipboard denied. Copy manually.', true);
+  }
+}
+
+function filenameForCurrentCode() {
+  const type = (els.type.value || DEFAULTS.type).replace(/[^a-z0-9_-]+/gi, '-');
+  return `${type || 'code'}-${Date.now()}.png`;
+}
+
+async function readError(response) {
+  try {
+    const payload = await response.json();
+    if (payload && payload.error) {
+      return payload.error;
+    }
+  } catch {
+    // Intentionally ignore JSON parsing errors and fall back to status text.
+  }
+
+  return response.statusText || 'Render failed';
 }
 
 function blobToImage(blob) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(blob);
     const img = new Image();
+
     img.onload = () => resolve(img);
     img.onerror = () => {
       URL.revokeObjectURL(url);
-      reject(new Error('Could not load generated image.'));
+      reject(new Error('Could not decode image.'));
     };
     img.src = url;
   });
 }
 
-async function readError(response) {
-  const contentType = response.headers.get('content-type') || '';
-  if (contentType.includes('application/json')) {
-    const payload = await response.json();
-    return payload.error || `Render failed with HTTP ${response.status}`;
-  }
-  return response.text();
+function drawImageToCanvas(image) {
+  els.canvas.width = image.naturalWidth;
+  els.canvas.height = image.naturalHeight;
+  const ctx = els.canvas.getContext('2d');
+  ctx.clearRect(0, 0, els.canvas.width, els.canvas.height);
+  ctx.drawImage(image, 0, 0);
 }
 
-async function copyText(text, successMessage) {
+function registerServiceWorker() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+  }
+}
+
+async function encodeState(payload) {
+  const json = new TextEncoder().encode(JSON.stringify(payload));
+  if (typeof CompressionStream === 'undefined') {
+    return toBase64Url(json);
+  }
+
+  const compressed = await compress(json);
+  return `z.${toBase64Url(compressed)}`;
+}
+
+async function decodeState(encoded) {
   try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(text);
-    } else {
-      fallbackCopy(text);
+    if (encoded.startsWith('z.')) {
+      if (typeof DecompressionStream === 'undefined') {
+        return null;
+      }
+
+      const bytes = fromBase64Url(encoded.slice(2));
+      const raw = await decompress(bytes);
+      return expandState(JSON.parse(new TextDecoder().decode(raw)));
     }
-    setStatus(successMessage);
-  } catch (error) {
-    setStatus(`Copy failed: ${error.message || error}`, true);
+
+    return expandState(JSON.parse(new TextDecoder().decode(fromBase64Url(encoded))));
+  } catch {
+    return null;
   }
 }
 
-function fallbackCopy(text) {
-  const textarea = document.createElement('textarea');
-  textarea.value = text;
-  textarea.setAttribute('readonly', '');
-  textarea.style.position = 'fixed';
-  textarea.style.top = '-1000px';
-  document.body.appendChild(textarea);
-  textarea.select();
-  document.execCommand('copy');
-  textarea.remove();
+function expandState(payload) {
+  const state = {};
+  const dict = (payload && payload.d) || {};
+
+  for (const [key, value] of Object.entries(dict)) {
+    state[KEY_MAP[key] || key] = String(value);
+  }
+
+  return state;
 }
 
-function filenameForCurrentCode() {
-  const safeType = (els.type.value || DEFAULTS.type).replace(/[^a-z0-9_-]+/gi, '-').slice(0, 64);
-  const size = els.size.value || DEFAULTS.size;
-  const margin = els.margin.value || DEFAULTS.margin;
-  return `${safeType}-${size}px-m${margin}.png`;
+async function compress(bytes) {
+  const cs = new CompressionStream('deflate-raw');
+  const writer = cs.writable.getWriter();
+  writer.write(bytes);
+  writer.close();
+  return new Uint8Array(await new Response(cs.readable).arrayBuffer());
 }
 
-function setStatus(message, error = false) {
-  els.status.textContent = message;
-  els.status.dataset.error = error ? 'true' : 'false';
+async function decompress(bytes) {
+  const ds = new DecompressionStream('deflate-raw');
+  const writer = ds.writable.getWriter();
+  writer.write(bytes);
+  writer.close();
+  return new Uint8Array(await new Response(ds.readable).arrayBuffer());
+}
+
+function toBase64Url(bytes) {
+  let str = '';
+  for (const byte of bytes) {
+    str += String.fromCharCode(byte);
+  }
+
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function fromBase64Url(str) {
+  const b64 = str.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = b64 + '==='.slice((b64.length + 3) % 4);
+  const bin = atob(padded);
+  const out = new Uint8Array(bin.length);
+
+  for (let i = 0; i < bin.length; i += 1) {
+    out[i] = bin.charCodeAt(i);
+  }
+
+  return out;
 }
