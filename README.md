@@ -42,3 +42,18 @@ http://localhost:8080/api/code.png?type=qrcode&input=text&data=https%3A%2F%2Fexa
 ```
 
 ![Example QR code](http://127.0.0.1:8080/api/code.png?type=qrcode&input=text&data=https%3A%2F%2Fexample.com%2F%3Fhello%3Dworld&size=256&margin=9&scale=4&rotate=N&fg=000000&bg=ffffff&includetext=false&textalign=center)
+
+
+## Compact share URLs
+
+The UI now stores page state in a compact `s` query parameter by default. It uses:
+
+- one-letter key aliases for all barcode settings
+- JSON payload versioning
+- deflate-raw compression + Base64URL encoding when supported by the browser
+
+This makes long `data` payload links much shorter and still URL-safe.
+
+## PWA shell
+
+The app now includes a basic Progressive Web App shell (`manifest.webmanifest` + `service-worker.js`) so it can be installed and the static UI shell can load offline. API image generation remains network-backed.

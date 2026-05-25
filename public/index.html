@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Code Canvas Generator</title>
   <link rel="stylesheet" href="/style.css">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#111111">
   <script src="/app.js" defer></script>
 </head>
 <body>
@@ -138,7 +140,9 @@
         <div class="actions">
           <button type="button" id="sample">Use sample for type</button>
           <button type="button" id="copy-page">Copy page URL</button>
+          <button type="button" id="copy-short-page">Copy short page URL</button>
           <button type="button" id="copy-image">Copy image URL</button>
+          <button type="button" id="copy-short-image">Copy short image URL</button>
           <button type="button" id="download">Download PNG</button>
         </div>
       </form>
@@ -160,6 +164,11 @@
       <label>
         Generated image URL
         <input id="image-url" readonly spellcheck="false">
+      </label>
+
+      <label>
+        Compressed share URL
+        <input id="short-url" readonly spellcheck="false">
       </label>
 
       <p class="note">

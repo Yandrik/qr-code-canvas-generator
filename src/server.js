@@ -1,6 +1,7 @@
 'use strict';
 
 const path = require('node:path');
+const zlib = require('node:zlib');
 const express = require('express');
 const { renderCodePng } = require('./render');
 const { POPULAR_TYPES, sampleForType } = require('./symbologies');
@@ -48,7 +49,7 @@ app.get('/api/sample/:type', (req, res) => {
 
 app.get('/api/code.png', async (req, res) => {
   try {
-    const result = await renderCodePng(req.query);
+    const result = await renderCodePng(expandShortQuery(req.query));
     res.setHeader('Content-Type', 'image/png');
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Code-Type', result.normalized.type);
@@ -92,4 +93,56 @@ function messageFromError(error) {
     return error;
   }
   return error.message || String(error);
+}
+
+function expandShortQuery(query) {
+  const short = typeof query.s === 'string' ? query.s : '';
+  if (!short) {
+    return query;
+  }
+
+  try {
+    const payload = decodeShortPayload(short);
+    const dict = payload && payload.d ? payload.d : {};
+    const expanded = {};
+    for (const [key, value] of Object.entries(dict)) {
+      expanded[KEY_MAP[key] || key] = String(value);
+    }
+    return expanded;
+  } catch {
+    return query;
+  }
+}
+
+const KEY_MAP = {
+  t: 'type',
+  i: 'input',
+  d: 'data',
+  z: 'size',
+  m: 'margin',
+  c: 'scale',
+  r: 'rotate',
+  f: 'fg',
+  b: 'bg',
+  x: 'includetext',
+  a: 'textalign',
+  h: 'heightmm',
+  e: 'eclevel',
+  n: 'parsefnc',
+  p: 'parse'
+};
+
+function decodeShortPayload(encoded) {
+  if (encoded.startsWith('z.')) {
+    const compressed = base64UrlDecode(encoded.slice(2));
+    const raw = zlib.inflateRawSync(compressed);
+    return JSON.parse(raw.toString('utf8'));
+  }
+  return JSON.parse(base64UrlDecode(encoded).toString('utf8'));
+}
+
+function base64UrlDecode(value) {
+  const b64 = value.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = b64 + '==='.slice((b64.length + 3) % 4);
+  return Buffer.from(padded, 'base64');
 }
